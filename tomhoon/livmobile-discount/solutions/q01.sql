@@ -1,0 +1,7 @@
+-- Q01. 특정 월 할인 대상 모수 조회
+-- 핵심: 행 수가 아니라 계약 수 -> COUNT(DISTINCT)
+-- 검증: CNT = 203 (COUNT(*)로 세면 209)
+
+SELECT COUNT(DISTINCT CTRT_ID) AS CNT
+  FROM KB_DISCOUNT_INFO
+ WHERE BILL_YYMM = '202611';

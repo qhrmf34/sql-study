@@ -1,0 +1,39 @@
+-- Q04. 전월에만 존재하는 할인 대상
+-- 핵심: CTE로 (계약, 월) 중복 제거 -> 10월에는 있고 11월에는 없는 계약
+--       "없다"는 NOT EXISTS 또는 LEFT JOIN ... IS NULL로 표현
+-- 검증: 97건 (NEW 37 / PROD_CHG 25 / PORT_OUT 20 / TERMINATE 15)
+
+-- 방법 1. NOT EXISTS
+WITH A AS (
+    SELECT DISTINCT CTRT_ID, BILL_YYMM
+      FROM KB_DISCOUNT_INFO
+)
+SELECT CI.CTRT_ID
+     , CI.PROD_CD
+     , CI.ORDER_TP
+  FROM CTRT_INFO CI
+  JOIN A a10
+    ON a10.CTRT_ID = CI.CTRT_ID
+   AND a10.BILL_YYMM = '202610'
+ WHERE NOT EXISTS (
+        SELECT 1
+          FROM A a11
+         WHERE a11.CTRT_ID = CI.CTRT_ID
+           AND a11.BILL_YYMM = '202611'
+       );
+
+-- 방법 2. LEFT JOIN + IS NULL
+-- 주의: 11월 조건은 ON 절에 둘 것 (WHERE에 두면 INNER JOIN처럼 동작해서 0건)
+-- WITH A AS (
+--     SELECT DISTINCT CTRT_ID, BILL_YYMM
+--       FROM KB_DISCOUNT_INFO
+-- )
+-- SELECT CI.CTRT_ID, CI.PROD_CD, CI.ORDER_TP
+--   FROM CTRT_INFO CI
+--   JOIN A a10
+--     ON a10.CTRT_ID = CI.CTRT_ID
+--    AND a10.BILL_YYMM = '202610'
+--   LEFT JOIN A a11
+--     ON a11.CTRT_ID = CI.CTRT_ID
+--    AND a11.BILL_YYMM = '202611'
+--  WHERE a11.CTRT_ID IS NULL;
