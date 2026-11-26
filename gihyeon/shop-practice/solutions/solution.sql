@@ -15,8 +15,10 @@
 /* ==========================================================
    1. 테이블 생성
    ========================================================== */
-show databases;
-use liv;
+show
+databases;
+use
+liv;
 DROP TABLE IF EXISTS login_logs;
 DROP TABLE IF EXISTS order_items;
 DROP TABLE IF EXISTS orders;
@@ -32,7 +34,7 @@ CREATE TABLE users
     grade       VARCHAR(10) NOT NULL, -- VIP / GOLD / SILVER
     signup_date DATE        NOT NULL,
     status      VARCHAR(10) NOT NULL, -- ACTIVE / DORMANT / WITHDRAWN
-    referrer_id INT         NULL,     -- 추천인 user_id
+    referrer_id INT NULL,             -- 추천인 user_id
     FOREIGN KEY (referrer_id) REFERENCES users (user_id)
 );
 
@@ -41,7 +43,7 @@ CREATE TABLE categories
 (
     category_id   INT         NOT NULL PRIMARY KEY,
     category_name VARCHAR(50) NOT NULL,
-    parent_id     INT         NULL,
+    parent_id     INT NULL,
     FOREIGN KEY (parent_id) REFERENCES categories (category_id)
 );
 
@@ -64,7 +66,7 @@ CREATE TABLE orders
     user_id         INT         NOT NULL,
     order_date      DATETIME    NOT NULL,
     status          VARCHAR(10) NOT NULL,           -- PAID / SHIPPED / DELIVERED / CANCELED / REFUNDED
-    coupon_id       INT         NULL,               -- NULL 이 아니면 쿠폰 사용
+    coupon_id       INT NULL,                       -- NULL 이 아니면 쿠폰 사용
     discount_amount INT         NOT NULL DEFAULT 0, -- 주문 단위 할인액
     shipping_fee    INT         NOT NULL DEFAULT 0,
     FOREIGN KEY (user_id) REFERENCES users (user_id)
@@ -184,9 +186,9 @@ group by user_name
    (힌트: 헤더의 discount_amount 를 상세와 조인한 뒤 SUM 하면
           할인액이 중복 차감됩니다. 이 함정을 피해야 합니다.)
    ---------------------------------------------------------- */
-select DATE_FORMAT(order_date, '%Y%m')              as '월'
+select DATE_FORMAT(order_date, '%Y%m') as '월'
      , SUM(unit_price * quantity - discount_amount) as '순매출'
-     , COUNT(1)                                     as '주문건수'
+     , COUNT(1) as '주문건수'
 from orders o
          join order_items oi
               on o.order_id = oi.order_id
@@ -230,8 +232,8 @@ with t_categories as (select c1.category_id
                       from categories c1
                                left join categories c2
                                          on c1.parent_id = c2.category_id)
-select c.category_name                  as '대분류명'
-     , sum(oi.quantity)                 as '판매수량'
+select c.category_name as '대분류명'
+     , sum(oi.quantity) as '판매수량'
      , sum(oi.unit_price * oi.quantity) as '매출'
 from orders o
          join order_items oi on o.order_id = oi.order_id
@@ -273,37 +275,37 @@ where true
    "유효 주문이 있는 회원별로 첫 구매일, 첫 구매 주문번호,
     그 주문의 상품금액 합계를 뽑아주세요."
    ---------------------------------------------------------- */
-select *
-from users;
-
-select oi.*
-from users
-         join orders o on users.user_id = o.user_id
-         join order_items oi on o.order_id = oi.order_id
-where users.user_name = '김지훈'
-;
-with t_summary as (select u.user_id
-                        , u.user_name
-                        , min(o.order_date)                as '첫 구매일'
-                        , min(o.order_id)                  as '첫 구매 주문번호'
-                        , SUM(oi.unit_price * oi.quantity) as '상품금액 합계'
-                        , ROW_NUMBER() over (
+with t_summary as (
+    select u.user_id
+    , u.user_name
+    , min(o.order_date) as '첫 구매일'
+    , min(o.order_id) as '첫 구매 주문번호'
+    , SUM(oi.unit_price * oi.quantity) as '상품금액 합계'
+    , ROW_NUMBER() over (
         partition by u.user_id
         order by o.order_id
-        )                                                  as rn
-                   from order_items oi
-                            join orders o on oi.order_id = o.order_id
-                            join products p on oi.product_id = p.product_id
-                            join users u on o.user_id = u.user_id
-                   where true
-                     and p.is_active = 'Y'
-                   group by u.user_id, o.order_id)
+    ) as rn
+    from order_items oi
+            join orders o on oi.order_id = o.order_id
+            join products p on oi.product_id = p.product_id
+            join users u on o.user_id = u.user_id
+    where true
+    and p.is_active = 'Y'
+    group by u.user_id, o.order_id
+)
 select *
 from t_summary
 where rn = 1
 ;
-
-
+select o.*
+from order_items oi
+            join orders o on oi.order_id = o.order_id
+            join products p on oi.product_id = p.product_id
+            join users u on o.user_id = u.user_id
+    where true
+    and p.is_active = 'Y'
+    and o.status != 'CANCELED'
+;
 /* ----------------------------------------------------------
    Q6. [마케팅팀] 재구매율
    "유효 주문이 1건 이상인 회원 중 2건 이상인 회원의 비율(%)을
@@ -316,20 +318,16 @@ with t_over2 as (select distinct u.user_id
                           join products p on oi.product_id = p.product_id
                  group by u.user_id
                  having count(o.order_id) > 2)
-   ,t_over1 as (
-    select distinct u.user_id
-    from order_items oi
-             join orders o on oi.order_id = o.order_id
-             join users u on o.user_id = u.user_id
-             join products p on oi.product_id = p.product_id
-    where true
-      and p.is_active = 'Y'
-      and o.status NOT IN ('CANCELED', 'REFUNDED')
-)
-select  (select count(*) from t_over2) / (select count(*) from t_over1) * 100
+   , t_over1 as (select distinct u.user_id
+                 from order_items oi
+                          join orders o on oi.order_id = o.order_id
+                          join users u on o.user_id = u.user_id
+                          join products p on oi.product_id = p.product_id
+                 where true
+                   and p.is_active = 'Y'
+                   and o.status NOT IN ('CANCELED', 'REFUNDED'))
+select (select count(*) from t_over2) / (select count(*) from t_over1) * 100
 ;
-
-
 ;
 
 
@@ -383,9 +381,10 @@ select date_format(o.order_date, '%Y%m')
      , SUM(
                CASE WHEN o.status IN ('CANCELED', 'REFUNDED') THEN 1 ELSE 0 END
        ) / COUNT(*) * 100 as 이탈률
-from order_items oi
-         join orders o on oi.order_id = o.order_id
+from orders o
 group by date_format(o.order_date, '%Y%m')
+;
+
 ;
 
 
