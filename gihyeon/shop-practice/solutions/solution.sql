@@ -277,20 +277,20 @@ where true
    ---------------------------------------------------------- */
 with t_summary as (
     select u.user_id
-    , u.user_name
-    , min(o.order_date) as '첫 구매일'
-    , min(o.order_id) as '첫 구매 주문번호'
-    , SUM(oi.unit_price * oi.quantity) as '상품금액 합계'
-    , ROW_NUMBER() over (
+         , u.user_name
+         , min(o.order_date) as '첫 구매일'
+         , min(o.order_id) as '첫 구매 주문번호'
+         , SUM(oi.unit_price * oi.quantity) as '상품금액 합계'
+         , ROW_NUMBER() over (
         partition by u.user_id
         order by o.order_id
-    ) as rn
+        ) as rn
     from order_items oi
-            join orders o on oi.order_id = o.order_id
-            join products p on oi.product_id = p.product_id
-            join users u on o.user_id = u.user_id
+             join orders o on oi.order_id = o.order_id
+             join products p on oi.product_id = p.product_id
+             join users u on o.user_id = u.user_id
     where true
-    and p.is_active = 'Y'
+      and p.is_active = 'Y'
     group by u.user_id, o.order_id
 )
 select *
@@ -299,12 +299,12 @@ where rn = 1
 ;
 select o.*
 from order_items oi
-            join orders o on oi.order_id = o.order_id
-            join products p on oi.product_id = p.product_id
-            join users u on o.user_id = u.user_id
-    where true
-    and p.is_active = 'Y'
-    and o.status != 'CANCELED'
+         join orders o on oi.order_id = o.order_id
+         join products p on oi.product_id = p.product_id
+         join users u on o.user_id = u.user_id
+where true
+  and p.is_active = 'Y'
+  and o.status != 'CANCELED'
 ;
 /* ----------------------------------------------------------
    Q6. [마케팅팀] 재구매율
@@ -338,12 +338,20 @@ select (select count(*) from t_over2) / (select count(*) from t_over1) * 100
     첫 달은 전월이 없으니 NULL 이어도 됩니다."
    ---------------------------------------------------------- */
 select
-     o.order_date
-    ,SUM(oi.unit_price * oi.quantity) as '매출'
-from order_items oi
-join orders o
-    on oi.order_id = o.order_id
-group by DATE_FORMAT(o.order_date, '%Y%m')
+    t.월
+     ,lag(t.매출, 1) over (order by t.월) as '전월매출'
+     ,t.매출
+     ,CONCAT((t.매출 / lag(t.매출, 1) over (order by t.월) * 100) - 100, '%') as '증감율'
+From (
+
+         select
+             DATE_FORMAT(o.order_date, '%Y%m') as '월'
+              ,SUM(oi.unit_price * oi.quantity) as '매출'
+         from order_items oi
+                  join orders o
+                       on oi.order_id = o.order_id
+         group by DATE_FORMAT(o.order_date, '%Y%m')
+     ) t
 ;
 
 /* ----------------------------------------------------------
@@ -352,6 +360,32 @@ group by DATE_FORMAT(o.order_date, '%Y%m')
     최대 연속 일수를 알려주세요.
     하루에 여러 번 로그인한 건은 1일로 칩니다."
    ---------------------------------------------------------- */
+select
+
+    t2.user_id
+     ,count(t2.subed_logday) as '최대연속일수'
+
+from (
+
+
+         select
+             t.*
+              ,DATE_SUB(t.logday, INTERVAL t.rn DAY) as 'subed_logday'
+         from (
+                  SELECT
+                      ll.user_id
+                       ,DATE_FORMAT(login_at, '%Y%m%d') as logday
+                       ,ROW_NUMBER() over (
+        partition by ll.user_id
+        order by ll.user_id
+        ) rn
+                  from login_logs ll
+                  group by ll.user_id, DATE_FORMAT(login_at, '%Y%m%d')
+              ) t
+     ) t2
+group by t2.user_id, t2.subed_logday
+having count(t2.subed_logday) >=3
+;
 
 
 /* ----------------------------------------------------------
@@ -361,7 +395,19 @@ group by DATE_FORMAT(o.order_date, '%Y%m')
     추천 실적이 있는 추천인만 나오게 하고,
     추천 가입자 수가 많은 순으로 정렬해주세요."
    ---------------------------------------------------------- */
-
+select
+    u2.user_name
+     ,COUNT(u2.user_name) as '추천가입자수'
+    ,SUM(
+        CASE WHEN (SELECT COUNT(*) FROM orders o WHERE u1.user_id = o.user_id and o.status NOT IN ('REFUNDED', 'CANCELED')) > 0 THEN 1 ELSE 0 END
+     ) as '유효가입자수'
+from users u1
+         join users u2
+              on u1.referrer_id = u2.user_id
+where 1=1
+group by u2.user_id, u2.user_name
+order by count(u2.user_name) desc
+;
 
 /* ----------------------------------------------------------
    Q10. [운영팀] 월별 주문 상태 현황 (피벗)
