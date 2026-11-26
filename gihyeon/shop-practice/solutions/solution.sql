@@ -337,7 +337,14 @@ select (select count(*) from t_over2) / (select count(*) from t_over1) * 100
    "Q2 결과에 전월 순매출과 전월 대비 증감률(%)을 붙여주세요.
     첫 달은 전월이 없으니 NULL 이어도 됩니다."
    ---------------------------------------------------------- */
-
+select
+     o.order_date
+    ,SUM(oi.unit_price * oi.quantity) as '매출'
+from order_items oi
+join orders o
+    on oi.order_id = o.order_id
+group by DATE_FORMAT(o.order_date, '%Y%m')
+;
 
 /* ----------------------------------------------------------
    Q8. [그로스팀] 3일 이상 연속 로그인 회원
